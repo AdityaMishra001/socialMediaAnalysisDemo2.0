@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy import text
 from app.core.config import settings
 
 # Normalize database URL for async drivers
@@ -45,3 +46,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Auto-migration: ensure social_metadata column exists
+        try:
+            await conn.execute(text("ALTER TABLE feedback_analyses ADD COLUMN social_metadata JSON;"))
+        except Exception:
+            pass

@@ -14,6 +14,7 @@ class FeedbackAnalysis(Base):
     item_count = Column(Integer, default=0)
     raw_sample = Column(Text, nullable=True)
     status = Column(String(20), default="completed")  # completed, failed
+    social_metadata = Column(JSON, nullable=True)
     result = Column(JSON, nullable=False)
     error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -27,6 +28,7 @@ class FeedbackAnalysis(Base):
             "item_count": self.item_count,
             "raw_sample": self.raw_sample,
             "status": self.status,
+            "social_metadata": self.social_metadata,
             "result": self.result,
             "error_message": self.error_message,
             "created_at": self.created_at.isoformat() if self.created_at else None,

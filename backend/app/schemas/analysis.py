@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel, Field
 
 class SentimentDistribution(BaseModel):
@@ -67,6 +67,7 @@ class AnalysisResponse(BaseModel):
     item_count: int
     raw_sample: Optional[str] = None
     status: str
+    social_metadata: Optional[Dict[str, Any]] = None
     result: AnalysisResult
     error_message: Optional[str] = None
     created_at: Optional[str] = None

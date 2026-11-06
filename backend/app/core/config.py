@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: Optional[str] = None
     LLM_MODEL: str = "gpt-4o-mini"
     
+    # Social Media API Keys
+    YOUTUBE_API_KEY: Optional[str] = None
+    
     # Database Settings
     DATABASE_URL: str = "sqlite+aiosqlite:///./feedback_ai.db"
     

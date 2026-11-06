@@ -60,6 +60,16 @@ export interface AnalysisResult {
   is_simulated?: boolean;
 }
 
+export interface SocialMetadata {
+  title: string;
+  author: string;
+  thumbnail_url?: string;
+  url: string;
+  platform: string;
+  scope: 'video' | 'short' | 'channel' | 'post';
+  stats?: Record<string, any>;
+}
+
 export interface AnalysisResponse {
   id: string;
   feedback_source: string;
@@ -68,22 +78,24 @@ export interface AnalysisResponse {
   item_count: number;
   raw_sample?: string;
   status: string;
+  social_metadata?: SocialMetadata;
   result: AnalysisResult;
   error_message?: string;
   created_at?: string;
 }
 
 export const FEEDBACK_SOURCES = [
+  { value: 'youtube_video', label: 'YouTube Video', icon: 'Youtube' },
+  { value: 'youtube_short', label: 'YouTube Short / Reel', icon: 'Video' },
+  { value: 'youtube_channel', label: 'YouTube Channel Community', icon: 'Users' },
+  { value: 'reddit_post', label: 'Reddit Discussion Thread', icon: 'MessageSquare' },
   { value: 'instagram', label: 'Instagram Comments', icon: 'Instagram' },
-  { value: 'youtube', label: 'YouTube Video Comments', icon: 'Youtube' },
   { value: 'tiktok', label: 'TikTok Comments', icon: 'Video' },
   { value: 'product_reviews', label: 'Product Reviews (Amazon/Shopify)', icon: 'ShoppingBag' },
   { value: 'app_store', label: 'App Store / Play Store Reviews', icon: 'Smartphone' },
   { value: 'customer_support', label: 'Customer Support Tickets', icon: 'Headphones' },
   { value: 'student_feedback', label: 'Student Course Evaluations', icon: 'GraduationCap' },
   { value: 'employee_survey', label: 'Employee Pulse Surveys', icon: 'Users' },
-  { value: 'nps_survey', label: 'NPS & Customer Surveys', icon: 'BarChart' },
-  { value: 'community', label: 'Community / Reddit Discussions', icon: 'MessageSquare' },
   { value: 'general', label: 'General / Mixed Feedback', icon: 'Layers' },
 ];
 

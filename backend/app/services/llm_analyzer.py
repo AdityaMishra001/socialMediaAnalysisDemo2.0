@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 SOURCE_DESCRIPTIONS = {
     "instagram": "Instagram comments and social media interactions",
     "youtube": "YouTube video comments and viewer feedback",
+    "youtube_video": "YouTube long-form video (focus on hook, pacing, timestamped reactions, comprehension, and follow-up topics)",
+    "youtube_short": "YouTube Short / Reel (focus on first-3-seconds hook, viral trigger, punchline, replayability, and quick reactions)",
+    "youtube_channel": "YouTube Channel Community (focus on macro audience personas, recurring requests, channel niche positioning, and community loyalty)",
+    "reddit_post": "Reddit discussion thread (focus on community consensus vs dissent, technical depth, and top counterarguments)",
     "tiktok": "TikTok comments and audience feedback",
     "product_reviews": "E-commerce product reviews and customer ratings",
     "app_store": "Mobile App Store / Play Store reviews",
@@ -247,52 +251,140 @@ def _generate_smart_analysis(
     source_label = SOURCE_DESCRIPTIONS.get(feedback_source, feedback_source)
     goal_label = GOAL_DESCRIPTIONS.get(analysis_goal, analysis_goal)
 
-    # Key Themes
-    key_themes = [
-        ThemeItem(
-            theme="User Experience & Usability",
-            count=max(1, int(total * 0.4)),
-            sentiment="positive" if pos_pct >= 50 else ("negative" if neg_pct >= 40 else "mixed"),
-            urgency="high" if neg_pct >= 40 else "medium",
-            representative_quotes=pos_quotes[:2] if pos_pct >= neg_pct else neg_quotes[:2],
-        ),
-        ThemeItem(
-            theme="Reliability & Performance",
-            count=max(1, int(total * 0.3)),
-            sentiment="negative" if neg_count > 0 else "neutral",
-            urgency="critical" if neg_pct > 35 else "low",
-            representative_quotes=neg_quotes[:2] if neg_quotes else ["No major stability blockers reported."],
-        ),
-        ThemeItem(
-            theme="Content Depth & Value",
-            count=max(1, int(total * 0.25)),
-            sentiment="positive" if pos_count > 0 else "neutral",
-            urgency="low",
-            representative_quotes=pos_quotes[2:4] if len(pos_quotes) >= 4 else (pos_quotes[:1] or ["Valuable insights provided."]),
-        ),
-    ]
-
-    # Aspect Sentiments
-    aspect_sentiments = [
-        AspectSentiment(
-            aspect="Core Experience & Content",
-            sentiment="positive" if pos_pct >= 50 else "neutral",
-            score=round(min(1.0, max(0.1, (pos_pct + 10) / 100)), 2),
-            supporting_examples=pos_quotes[:1] or ["Positive user appreciation."],
-        ),
-        AspectSentiment(
-            aspect="Speed & Efficiency",
-            sentiment="negative" if neg_pct > 30 else "positive",
-            score=round(max(0.2, min(0.9, (100 - neg_pct) / 100)), 2),
-            supporting_examples=neg_quotes[:1] or ["Smooth experience with minimal delay."],
-        ),
-        AspectSentiment(
-            aspect="Clarity & Communication",
-            sentiment="neutral" if neut_pct > 40 else ("positive" if pos_pct > neg_pct else "negative"),
-            score=0.72,
-            supporting_examples=detected_questions[:1] or ["Clear structure throughout."],
-        ),
-    ]
+    # Key Themes adapting to social context
+    if feedback_source == "youtube_short":
+        key_themes = [
+            ThemeItem(
+                theme="Hook & First 3 Seconds Retention",
+                count=max(1, int(total * 0.45)),
+                sentiment="positive" if pos_pct >= 50 else "mixed",
+                urgency="medium",
+                representative_quotes=pos_quotes[:2] if pos_quotes else ["Hook captured viewer attention immediately."],
+            ),
+            ThemeItem(
+                theme="Viral Factor & Shareability",
+                count=max(1, int(total * 0.35)),
+                sentiment="positive" if pos_count > 0 else "neutral",
+                urgency="low",
+                representative_quotes=pos_quotes[1:3] if len(pos_quotes) >= 3 else (pos_quotes[:1] or ["High replay value."]),
+            ),
+            ThemeItem(
+                theme="Viewer Questions & Part 2 Demand",
+                count=max(1, int(total * 0.25)),
+                sentiment="neutral",
+                urgency="high",
+                representative_quotes=detected_questions[:2] if detected_questions else ["Audience requesting follow-up short."],
+            ),
+        ]
+        aspect_sentiments = [
+            AspectSentiment(aspect="Hook Effectiveness", sentiment="positive" if pos_pct >= 50 else "neutral", score=round(min(1.0, max(0.1, (pos_pct + 15) / 100)), 2), supporting_examples=pos_quotes[:1] or ["Strong initial hook."]),
+            AspectSentiment(aspect="Pacing & Flow", sentiment="positive" if neg_pct < 25 else "mixed", score=round(max(0.3, min(0.95, (100 - neg_pct) / 100)), 2), supporting_examples=pos_quotes[1:2] or ["Smooth transition throughout."]),
+            AspectSentiment(aspect="Entertainment & Punchline", sentiment="positive" if pos_pct > neg_pct else "neutral", score=0.84, supporting_examples=pos_quotes[:1] or ["Punchline landed well."]),
+        ]
+    elif feedback_source == "youtube_video":
+        key_themes = [
+            ThemeItem(
+                theme="Explanation Clarity & Value",
+                count=max(1, int(total * 0.4)),
+                sentiment="positive" if pos_pct >= 50 else "mixed",
+                urgency="low",
+                representative_quotes=pos_quotes[:2] if pos_quotes else ["Concepts explained step-by-step."],
+            ),
+            ThemeItem(
+                theme="Pacing & Video Length",
+                count=max(1, int(total * 0.3)),
+                sentiment="mixed" if neg_pct > 20 else "positive",
+                urgency="medium",
+                representative_quotes=neg_quotes[:2] if neg_quotes else ["Pacing maintained audience attention."],
+            ),
+            ThemeItem(
+                theme="Audio Balance & Production Quality",
+                count=max(1, int(total * 0.25)),
+                sentiment="negative" if neg_count > 0 else "positive",
+                urgency="high" if neg_pct > 25 else "low",
+                representative_quotes=neg_quotes[:1] or ["Clean audio with balanced volume."],
+            ),
+        ]
+        aspect_sentiments = [
+            AspectSentiment(aspect="Depth of Content", sentiment="positive" if pos_pct >= 50 else "neutral", score=round(min(1.0, max(0.1, (pos_pct + 10) / 100)), 2), supporting_examples=pos_quotes[:1] or ["Thorough and informative."]),
+            AspectSentiment(aspect="Pacing & Retention", sentiment="neutral" if neg_pct > 25 else "positive", score=round(max(0.2, min(0.9, (100 - neg_pct) / 100)), 2), supporting_examples=neg_quotes[:1] or ["Good structure throughout."]),
+            AspectSentiment(aspect="Audio & Visuals", sentiment="positive" if neg_pct < 20 else "mixed", score=0.78, supporting_examples=pos_quotes[:1] or ["Clear visual presentation."]),
+        ]
+    elif feedback_source == "youtube_channel":
+        key_themes = [
+            ThemeItem(
+                theme="Community Loyalty & Niche Authority",
+                count=max(1, int(total * 0.45)),
+                sentiment="positive" if pos_pct >= 50 else "mixed",
+                urgency="low",
+                representative_quotes=pos_quotes[:2] if pos_quotes else ["Long-time subscribers actively recommending the channel."],
+            ),
+            ThemeItem(
+                theme="Content Gaps & Requested Series",
+                count=max(1, int(total * 0.35)),
+                sentiment="neutral",
+                urgency="high",
+                representative_quotes=detected_questions[:2] if detected_questions else ["Audience requesting advanced deep-dives."],
+            ),
+            ThemeItem(
+                theme="Upload Consistency & Schedule",
+                count=max(1, int(total * 0.25)),
+                sentiment="mixed",
+                urgency="medium",
+                representative_quotes=neg_quotes[:1] or ["Viewers eager for consistent weekly content."],
+            ),
+        ]
+        aspect_sentiments = [
+            AspectSentiment(aspect="Niche Authority & Trust", sentiment="positive", score=0.88, supporting_examples=pos_quotes[:1] or ["Recognized as a reliable resource."]),
+            AspectSentiment(aspect="Community Engagement", sentiment="positive" if pos_pct >= 50 else "neutral", score=0.82, supporting_examples=pos_quotes[:1] or ["Creator actively responds to audience."]),
+            AspectSentiment(aspect="Content Freshness", sentiment="mixed" if neg_pct > 25 else "positive", score=0.74, supporting_examples=detected_questions[:1] or ["Topics resonate with target audience."]),
+        ]
+    else:
+        # Default Themes
+        key_themes = [
+            ThemeItem(
+                theme="User Experience & Usability",
+                count=max(1, int(total * 0.4)),
+                sentiment="positive" if pos_pct >= 50 else ("negative" if neg_pct >= 40 else "mixed"),
+                urgency="high" if neg_pct >= 40 else "medium",
+                representative_quotes=pos_quotes[:2] if pos_pct >= neg_pct else neg_quotes[:2],
+            ),
+            ThemeItem(
+                theme="Reliability & Performance",
+                count=max(1, int(total * 0.3)),
+                sentiment="negative" if neg_count > 0 else "neutral",
+                urgency="critical" if neg_pct > 35 else "low",
+                representative_quotes=neg_quotes[:2] if neg_quotes else ["No major stability blockers reported."],
+            ),
+            ThemeItem(
+                theme="Content Depth & Value",
+                count=max(1, int(total * 0.25)),
+                sentiment="positive" if pos_count > 0 else "neutral",
+                urgency="low",
+                representative_quotes=pos_quotes[2:4] if len(pos_quotes) >= 4 else (pos_quotes[:1] or ["Valuable insights provided."]),
+            ),
+        ]
+        # Default Aspect Sentiments
+        aspect_sentiments = [
+            AspectSentiment(
+                aspect="Core Experience & Content",
+                sentiment="positive" if pos_pct >= 50 else "neutral",
+                score=round(min(1.0, max(0.1, (pos_pct + 10) / 100)), 2),
+                supporting_examples=pos_quotes[:1] or ["Positive user appreciation."],
+            ),
+            AspectSentiment(
+                aspect="Speed & Efficiency",
+                sentiment="negative" if neg_pct > 30 else "positive",
+                score=round(max(0.2, min(0.9, (100 - neg_pct) / 100)), 2),
+                supporting_examples=neg_quotes[:1] or ["Smooth experience with minimal delay."],
+            ),
+            AspectSentiment(
+                aspect="Clarity & Communication",
+                sentiment="neutral" if neut_pct > 40 else ("positive" if pos_pct > neg_pct else "negative"),
+                score=0.72,
+                supporting_examples=detected_questions[:1] or ["Clear structure throughout."],
+            ),
+        ]
 
     # Defaults if empty
     if not detected_complaints:

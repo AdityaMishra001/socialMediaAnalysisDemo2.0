@@ -18,7 +18,11 @@ import {
   Info,
   Calendar,
   Layers,
-  Target
+  Target,
+  ExternalLink,
+  Youtube,
+  MessageSquare,
+  Video
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -60,6 +64,81 @@ export const Dashboard: React.FC<DashboardProps> = ({
               in <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-bold">backend/.env</code>.
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Social Media Content Card if available */}
+      {analysis.social_metadata && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 animate-fadeIn">
+          <div className="flex items-center gap-4">
+            {analysis.social_metadata.thumbnail_url ? (
+              <img
+                src={analysis.social_metadata.thumbnail_url}
+                alt="Thumbnail"
+                className="w-24 h-16 object-cover rounded-2xl border border-slate-200 shadow-sm flex-shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
+                <MessageSquare className="w-8 h-8" />
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
+                  {analysis.social_metadata.scope === 'short' ? (
+                    <>
+                      <Video className="w-3 h-3" /> YouTube Short
+                    </>
+                  ) : analysis.social_metadata.scope === 'channel' ? (
+                    <>
+                      <Layers className="w-3 h-3" /> YouTube Channel
+                    </>
+                  ) : analysis.social_metadata.platform === 'reddit' ? (
+                    <>
+                      <MessageSquare className="w-3 h-3" /> Reddit Thread
+                    </>
+                  ) : (
+                    <>
+                      <Youtube className="w-3 h-3" /> YouTube Video
+                    </>
+                  )}
+                </span>
+                <span className="text-xs text-slate-500 font-medium">
+                  by <strong className="text-slate-800 font-bold">{analysis.social_metadata.author}</strong>
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                {analysis.social_metadata.title}
+              </h2>
+              {analysis.social_metadata.stats && (
+                <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                  {analysis.social_metadata.stats.view_count && (
+                    <span>{Number(analysis.social_metadata.stats.view_count).toLocaleString()} views</span>
+                  )}
+                  {analysis.social_metadata.stats.like_count && (
+                    <>
+                      <span>•</span>
+                      <span>{Number(analysis.social_metadata.stats.like_count).toLocaleString()} likes</span>
+                    </>
+                  )}
+                  <span>•</span>
+                  <span>{analysis.item_count} comments analyzed</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {analysis.social_metadata.url && (
+            <a
+              href={analysis.social_metadata.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-colors whitespace-nowrap"
+            >
+              <span>View Source</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          )}
         </div>
       )}
 

@@ -2,8 +2,9 @@ from __future__ import annotations
 import io
 import csv
 import json
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, Body
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
@@ -14,8 +15,106 @@ from app.models.analysis import FeedbackAnalysis
 from app.schemas.analysis import AnalysisResponse, AnalysisResult
 from app.services.file_parser import parse_csv_bytes, parse_txt_content, FileParseError
 from app.services.llm_analyzer import analyze_feedback
+from app.services.social_fetcher import fetch_social_content, identify_social_url, SocialFetcherError
 
 router = APIRouter()
+
+class SocialParseRequest(BaseModel):
+    url: str
+
+class SocialAnalyzeRequest(BaseModel):
+    url: str
+    goal: str = "improve_content"
+    language: str = "auto"
+
+@router.post("/social/parse")
+async def parse_social_url_endpoint(payload: SocialParseRequest):
+    """Inspect and preview a social media link (YouTube Video/Short/Channel or Reddit post)."""
+    try:
+        content = await fetch_social_content(payload.url)
+        return {
+            "platform": content["platform"],
+            "scope": content["scope"],
+            "title": content["title"],
+            "author": content["author"],
+            "thumbnail_url": content["thumbnail_url"],
+            "item_count": content["item_count"],
+            "stats": content["stats"],
+            "sample_comments": content["comments"][:3],
+        }
+    except SocialFetcherError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to inspect URL: {str(e)}")
+
+@router.post("/social/analyze", response_model=AnalysisResponse)
+async def analyze_social_url_endpoint(
+    payload: SocialAnalyzeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Directly fetch comments and analyze a YouTube or Reddit URL."""
+    try:
+        social_data = await fetch_social_content(payload.url)
+    except SocialFetcherError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch social comments: {str(e)}")
+
+    feedback_items = social_data["comments"]
+    if not feedback_items:
+        raise HTTPException(status_code=400, detail="No comments available to analyze for this link.")
+
+    feedback_source = social_data["platform"]
+    analysis_goal = payload.goal
+    raw_sample = "\n---\n".join(feedback_items[:3])
+
+    try:
+        analysis_result = await analyze_feedback(
+            feedback_items=feedback_items,
+            feedback_source=feedback_source,
+            analysis_goal=analysis_goal,
+            language=payload.language,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+    social_meta = {
+        "title": social_data["title"],
+        "author": social_data["author"],
+        "thumbnail_url": social_data["thumbnail_url"],
+        "url": social_data["url"],
+        "platform": social_data["platform"],
+        "scope": social_data["scope"],
+        "stats": social_data["stats"],
+    }
+
+    db_record = FeedbackAnalysis(
+        feedback_source=feedback_source,
+        analysis_goal=analysis_goal,
+        language=payload.language,
+        item_count=len(feedback_items),
+        raw_sample=raw_sample,
+        status="completed",
+        social_metadata=social_meta,
+        result=analysis_result.model_dump(),
+    )
+    db.add(db_record)
+    await db.commit()
+    await db.refresh(db_record)
+
+    return AnalysisResponse(
+        id=db_record.id,
+        feedback_source=db_record.feedback_source,
+        analysis_goal=db_record.analysis_goal,
+        language=db_record.language,
+        item_count=db_record.item_count,
+        raw_sample=db_record.raw_sample,
+        status=db_record.status,
+        social_metadata=social_meta,
+        result=analysis_result,
+        error_message=db_record.error_message,
+        created_at=db_record.created_at.isoformat() if db_record.created_at else None,
+    )
 
 @router.get("/health")
 async def health_check():
@@ -32,13 +131,35 @@ async def create_analysis(
     feedback_source: str = Form("general"),
     analysis_goal: str = Form("general"),
     language: str = Form("auto"),
+    social_url: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
 ):
     feedback_items: List[str] = []
+    social_meta = None
 
-    # 1. Process File if provided
-    if file and file.filename:
+    # 1. Process Social URL if provided
+    if social_url and social_url.strip():
+        try:
+            social_data = await fetch_social_content(social_url.strip())
+            feedback_items.extend(social_data["comments"])
+            feedback_source = social_data["platform"]
+            social_meta = {
+                "title": social_data["title"],
+                "author": social_data["author"],
+                "thumbnail_url": social_data["thumbnail_url"],
+                "url": social_data["url"],
+                "platform": social_data["platform"],
+                "scope": social_data["scope"],
+                "stats": social_data["stats"],
+            }
+        except SocialFetcherError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch social comments: {str(e)}")
+
+    # 2. Process File if provided
+    elif file and file.filename:
         filename_lower = file.filename.lower()
         content_bytes = await file.read()
 
@@ -62,16 +183,16 @@ async def create_analysis(
         except FileParseError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-    # 2. Process text area if provided (or append)
+    # 3. Process text area if provided (or append)
     if feedback_text and feedback_text.strip():
         text_items = parse_txt_content(feedback_text)
         feedback_items.extend(text_items)
 
-    # 3. Validate extracted items
+    # 4. Validate extracted items
     if not feedback_items:
         raise HTTPException(
             status_code=400,
-            detail="No feedback content detected. Please paste comments into the text box or upload a valid CSV/TXT file.",
+            detail="No feedback content detected. Please paste comments, provide a social link, or upload a valid CSV/TXT file.",
         )
 
     # Limit maximum items to prevent abuse
@@ -81,7 +202,7 @@ async def create_analysis(
     # Sample preview for storage
     raw_sample = "\n---\n".join(feedback_items[:3])
 
-    # 4. Perform AI Analysis
+    # 5. Perform AI Analysis
     try:
         analysis_result = await analyze_feedback(
             feedback_items=feedback_items,
@@ -92,7 +213,7 @@ async def create_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
-    # 5. Persist into Database
+    # 6. Persist into Database
     db_record = FeedbackAnalysis(
         feedback_source=feedback_source,
         analysis_goal=analysis_goal,
@@ -100,6 +221,7 @@ async def create_analysis(
         item_count=len(feedback_items),
         raw_sample=raw_sample,
         status="completed",
+        social_metadata=social_meta,
         result=analysis_result.model_dump(),
     )
     db.add(db_record)
@@ -114,6 +236,7 @@ async def create_analysis(
         item_count=db_record.item_count,
         raw_sample=db_record.raw_sample,
         status=db_record.status,
+        social_metadata=social_meta,
         result=analysis_result,
         error_message=db_record.error_message,
         created_at=db_record.created_at.isoformat() if db_record.created_at else None,
@@ -141,6 +264,7 @@ async def list_recent_analyses(
                     item_count=r.item_count,
                     raw_sample=r.raw_sample,
                     status=r.status,
+                    social_metadata=r.social_metadata,
                     result=res_obj,
                     error_message=r.error_message,
                     created_at=r.created_at.isoformat() if r.created_at else None,
@@ -171,6 +295,7 @@ async def get_analysis(
         item_count=record.item_count,
         raw_sample=record.raw_sample,
         status=record.status,
+        social_metadata=record.social_metadata,
         result=res_obj,
         error_message=record.error_message,
         created_at=record.created_at.isoformat() if record.created_at else None,

@@ -6,11 +6,17 @@
 
 ## 🌟 Key Features
 
-1. **Flexible Feedback Input**:
-   - **Direct Text Input**: Paste reviews, Instagram/YouTube comments, or open-ended survey answers.
+1. **Social Media & Video Link Analysis (100% Free)**:
+   - **YouTube Videos**: Paste any video link (`youtube.com/watch?v=...`) to analyze viewer retention, pacing complaints, and follow-up topics.
+   - **YouTube Shorts**: Paste any Short link (`youtube.com/shorts/...`) for hook retention, viral factors, and replayability analysis.
+   - **YouTube Channels**: Paste any channel handle (`youtube.com/@handle`) for macro-community sentiment, audience personas, and content gaps.
+   - **Reddit Threads**: Paste any Reddit discussion (`reddit.com/r/.../comments/...`) to extract community debates, top counter-arguments, and consensus.
+   - **Live URL Inspector**: Previews thumbnail, title, author, and comment counts before running analysis.
+2. **Flexible Multimodal Feedback Input**:
+   - **Direct Text Input**: Paste reviews, Instagram/YouTube comments, or survey answers.
    - **File Upload**: Upload `.csv` (with automatic feedback column detection) or `.txt` files.
-   - **One-Click Sample Datasets**: Instant test datasets for Instagram comments, e-commerce product reviews, and student feedback.
-2. **Context & Goal Adaptation**:
+   - **1-Click Sample Datasets**: Instant test datasets for social links, headphone reviews, and student feedback.
+3. **Context & Goal Adaptation**:
    - Adapts analysis to the specific feedback source (Instagram, App Store, Product Reviews, Customer Support, Student Evaluations, Employee Surveys, etc.).
    - Prioritizes recommendations toward your objective (Improve Content, Fix Product Quality, Boost CSAT, Reduce Churn, Enhance Teaching).
 3. **Structured AI Analysis**:
@@ -62,7 +68,11 @@ pip install -r requirements.txt
 
 # (Optional) Set your OpenAI API key in .env for live LLM mode
 # If omitted, it will automatically run in Smart Heuristic Simulation mode!
-# nano .env
+# OPENAI_API_KEY=sk-...
+
+# (Optional) Set your YouTube Data API v3 key for real YouTube comment fetching
+# Free tier gives 10,000 units/day (up to 1,000,000 comments/day) from Google Cloud Console
+# YOUTUBE_API_KEY=AIzaSy...
 
 # Run the FastAPI server
 python run.py
